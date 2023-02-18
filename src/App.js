@@ -6,51 +6,52 @@ import {
   Spacer,
   Textarea,
   Button,
+  Popover,
 } from "@nextui-org/react";
-import quiet, { ab2str } from "quietjs-bundle";
+import quiet, { ab2str, str2ab, mergeab } from "quietjs-bundle";
 
 function App() {
   const messageRef = React.useRef(null);
   const privateKeyRef = React.useRef(null);
   const receivedMessagesRef = React.useRef(null);
-  const [interfaceBusy, setInterfaceBusy] = useState(false);
-  quiet.addReadyCallback(() => {
-    console.log("Ready to transmit or listen...");
-    /* quiet.receiver({
-      profile: "audible",
-      onReceive(payload) {
-        console.log(quiet.ab2str(payload));
-      },
-    }); */
-  });
-
-  const receiveMessages = () => {
-    if (interfaceBusy) {
+  const [transmitterBusy, setTransmitterBusy] = useState(false);
+  const [receiver, setReceiver] = useState(null);
+  const toggleReceiver = () => {
+    if (receiver) {
+      receiver.destroy();
+      setReceiver(null);
+      return;
+    }
+    if (transmitterBusy) {
       return;
     }
     const rx = quiet.receiver({
       profile: "audible",
       onReceive: (payload) => {
         const receivedMessage = ab2str(payload);
-        console.log("Message received.");
-        console.log(receivedMessage);
+        receivedMessagesRef.current.value += receivedMessage + "\n";
+      },
+      onReceiveFail: (noOfFailedFrames) => {
+        receivedMessagesRef.current.value +=
+          "Received frame checksum failed.\n";
       },
     });
+    setReceiver(rx);
   };
 
   const transmitMessage = (payload) => {
-    if (interfaceBusy) {
+    if (transmitterBusy || receiver) {
       return;
     }
-    setInterfaceBusy(true);
+    setTransmitterBusy(true);
     const tx = quiet.transmitter({
       profile: "audible",
       onFinish: () => {
         console.log("Transmission end!");
-        setInterfaceBusy(false);
+        setTransmitterBusy(false);
       },
     });
-    tx.transmit(quiet.str2ab(payload));
+    tx.transmit(str2ab(payload));
   };
 
   return (
@@ -65,7 +66,7 @@ function App() {
             textAlign: "center",
           }}
         >
-          Tessarect
+          Tesseract
           <Text
             size={20}
             as="span"
@@ -108,12 +109,13 @@ function App() {
           </Grid>
           <Grid
             xs={12}
+            lg={6}
             css={{
               flexWrap: "wrap",
             }}
           >
             <Textarea
-              disabled
+              readOnly
               label="Received messages"
               ref={receivedMessagesRef}
               clearable
@@ -123,12 +125,46 @@ function App() {
               }}
             />
             <Button
+              color={receiver ? "warning" : "success"}
+              onPress={() => {
+                toggleReceiver();
+              }}
+              css={{
+                marginTop: "$10",
+                marginRight: "$10",
+              }}
+            >
+              {receiver ? "Stop listening" : "Listen"}
+            </Button>
+            <Popover>
+              <Popover.Trigger>
+                <Button
+                  auto
+                  css={{
+                    marginTop: "$10",
+                    marginLeft: "auto",
+                    background: "$blue700",
+                  }}
+                  onPress={() =>
+                    navigator.clipboard.writeText(
+                      receivedMessagesRef.current.value
+                    )
+                  }
+                >
+                  Copy
+                </Button>
+              </Popover.Trigger>
+              <Popover.Content css={{ p: "$8" }}>
+                {"Messages copied to clipboard"}
+              </Popover.Content>
+            </Popover>
+            <Button
               auto
               color="secondary"
               onPress={() => (receivedMessagesRef.current.value = null)}
               css={{
                 marginTop: "$10",
-                marginLeft: "auto",
+                marginLeft: "$10",
               }}
             >
               Clear
@@ -136,12 +172,14 @@ function App() {
           </Grid>
           <Grid
             xs={12}
+            lg={6}
             css={{
               flexWrap: "wrap",
             }}
           >
             <Textarea
-              label="Message"
+              disabled={transmitterBusy}
+              label="Send message"
               helperText="Enter your message to transmit"
               ref={messageRef}
               clearable
@@ -152,16 +190,16 @@ function App() {
             />
             <Button
               color="success"
-              disabled={interfaceBusy}
+              disabled={transmitterBusy}
               onPress={() => {
                 transmitMessage(messageRef.current.value);
               }}
               css={{
                 marginTop: "$10",
-                marginRight: "$10",
+                marginRight: "auto",
               }}
             >
-              {interfaceBusy ? "Sending..." : "Send"}
+              {transmitterBusy ? "Sending..." : "Send"}
             </Button>
             <Button
               auto
@@ -169,7 +207,7 @@ function App() {
               onPress={() => (messageRef.current.value = null)}
               css={{
                 marginTop: "$10",
-                marginLeft: "auto",
+                marginLeft: "$10",
               }}
             >
               Clear
