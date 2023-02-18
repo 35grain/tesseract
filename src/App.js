@@ -250,7 +250,7 @@ function App() {
                 <Textarea
                   ref={messageLogRef}
                   minRows={7}
-                  maxRows={20}
+                  maxRows={14}
                   readOnly
                   css={{
                     width: "100%",
