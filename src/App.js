@@ -8,8 +8,9 @@ import {
   Input,
   Collapse,
 } from "@nextui-org/react";
-import quiet, { ab2str, str2ab } from "quietjs-bundle";
+import quiet, { ab2str, str2ab, mergeab } from "quietjs-bundle";
 import TitleComponent from "./components/TitleComponent";
+import Blowfish from "javascript-blowfish";
 
 function App() {
   const messageRef = React.useRef(null);
@@ -17,7 +18,57 @@ function App() {
   const messageLogRef = React.useRef(null);
   const [transmitterBusy, setTransmitterBusy] = useState(false);
   const [receiver, setReceiver] = useState(null);
-  let lastReceivedTransmission = null;
+  let payloadBuffer = new ArrayBuffer(0);
+
+  function Timer(fn, t) {
+    var timerObj = setTimeout(fn, t);
+
+    this.stop = function () {
+      if (timerObj) {
+        clearTimeout(timerObj);
+        timerObj = null;
+      }
+      return this;
+    };
+
+    // start timer using current settings (if it's not already running)
+    this.start = function () {
+      if (!timerObj) {
+        this.stop();
+        timerObj = setTimeout(fn, t);
+      }
+      return this;
+    };
+
+    // start with new or original interval, stop current interval
+    this.reset = function (newT = t) {
+      t = newT;
+      return this.stop().start();
+    };
+  }
+
+  const decryptPayload = () => {
+    let decryptedPayload = ab2str(payloadBuffer);
+    if (privateKeyRef.current.value) {
+      const bf = new Blowfish(privateKeyRef.current.value);
+      decryptedPayload = bf.trimZeros(bf.decrypt(bf.base64Decode(decryptedPayload)));
+    }
+    // Reset payloadBuffer
+    payloadBuffer = new ArrayBuffer(0);
+
+    messageRef.current.value = decryptedPayload;
+    messageLogRef.current.value +=
+      "\n--> [" +
+      new Date().toLocaleDateString("et-EE", {
+        hour: "numeric",
+        minute: "numeric",
+        second: "numeric",
+      }) +
+      "]: " +
+      decryptedPayload;
+  };
+  const timer = new Timer(decryptPayload, 1000);
+  timer.stop();
 
   const toggleReceiver = () => {
     if (receiver) {
@@ -31,31 +82,8 @@ function App() {
     const rx = quiet.receiver({
       profile: "audible",
       onReceive: (payload) => {
-        const timeNow = new Date();
-        const timeSinceLastTransmission = lastReceivedTransmission
-          ? (timeNow - lastReceivedTransmission) / 1000
-          : -1;
-        lastReceivedTransmission = timeNow;
-        const receivedMessage = ab2str(payload);
-        const newLine = timeSinceLastTransmission >= 1;
-        const printTime = newLine || timeSinceLastTransmission === -1;
-        if (printTime) {
-          messageRef.current.value = receivedMessage;
-        } else {
-          messageRef.current.value += receivedMessage;
-        }
-        messageLogRef.current.value +=
-          (newLine ? "\n" : "") +
-          (printTime
-            ? "--> [" +
-              timeNow.toLocaleDateString("et-EE", {
-                hour: "numeric",
-                minute: "numeric",
-                second: "numeric",
-              }) +
-              "]: "
-            : "") +
-          receivedMessage;
+        payloadBuffer = mergeab(payloadBuffer, payload);
+        timer.reset();
       },
       onReceiveFail: (noOfFailedFrames) => {
         const timeNow = new Date();
@@ -77,6 +105,15 @@ function App() {
     if (transmitterBusy || receiver || payload.length === 0) {
       return;
     }
+    console.log(payload);
+    let encryptedPayload = payload;
+    if (privateKeyRef.current.value) {
+      const bf = new Blowfish(privateKeyRef.current.value);
+      encryptedPayload = bf.base64Encode(bf.encrypt(payload));
+    }
+
+    console.log(encryptedPayload);
+
     setTransmitterBusy(true);
     const tx = quiet.transmitter({
       profile: "audible",
@@ -90,10 +127,10 @@ function App() {
           }) +
           "]: " +
           payload;
-          setTransmitterBusy(false);
+        setTransmitterBusy(false);
       },
     });
-    tx.transmit(str2ab(payload));
+    tx.transmit(str2ab(encryptedPayload));
   };
 
   return (
@@ -157,7 +194,7 @@ function App() {
               <Button
                 auto
                 color="primary"
-                disabled={transmitterBusy}
+                disabled={transmitterBusy || receiver}
                 onPress={() => {
                   transmitMessage(messageRef.current.value);
                 }}
