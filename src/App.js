@@ -11,6 +11,7 @@ import {
 import quiet, { ab2str, str2ab, mergeab } from "quietjs-bundle";
 import TitleComponent from "./components/TitleComponent";
 import Blowfish from "javascript-blowfish";
+import quietProfile from './quietProfile.json';
 
 function App() {
   const messageRef = React.useRef(null);
@@ -18,6 +19,7 @@ function App() {
   const messageLogRef = React.useRef(null);
   const [transmitterBusy, setTransmitterBusy] = useState(false);
   const [receiver, setReceiver] = useState(null);
+  const bf_base64 = new Blowfish("");
   let payloadBuffer = new ArrayBuffer(0);
 
   function Timer(fn, t) {
@@ -48,10 +50,10 @@ function App() {
   }
 
   const decryptPayload = () => {
-    let decryptedPayload = ab2str(payloadBuffer);
+    let decryptedPayload = bf_base64.base64Decode(ab2str(payloadBuffer));
     if (privateKeyRef.current.value) {
       const bf = new Blowfish(privateKeyRef.current.value);
-      decryptedPayload = bf.trimZeros(bf.decrypt(bf.base64Decode(decryptedPayload)));
+      decryptedPayload = bf.trimZeros(bf.decrypt(decryptedPayload));
     }
     // Reset payloadBuffer
     payloadBuffer = new ArrayBuffer(0);
@@ -80,7 +82,8 @@ function App() {
       return;
     }
     const rx = quiet.receiver({
-      profile: "audible",
+      clampFrame: false,
+      profile: quietProfile,
       onReceive: (payload) => {
         payloadBuffer = mergeab(payloadBuffer, payload);
         timer.reset();
@@ -105,18 +108,16 @@ function App() {
     if (transmitterBusy || receiver || payload.length === 0) {
       return;
     }
-    console.log(payload);
     let encryptedPayload = payload;
     if (privateKeyRef.current.value) {
       const bf = new Blowfish(privateKeyRef.current.value);
-      encryptedPayload = bf.base64Encode(bf.encrypt(payload));
+      encryptedPayload = bf.encrypt(payload);
     }
-
-    console.log(encryptedPayload);
 
     setTransmitterBusy(true);
     const tx = quiet.transmitter({
-      profile: "audible",
+      clampFrame: false,
+      profile: quietProfile,
       onFinish: () => {
         messageLogRef.current.value +=
           "\n<-- [" +
@@ -130,7 +131,7 @@ function App() {
         setTransmitterBusy(false);
       },
     });
-    tx.transmit(str2ab(encryptedPayload));
+    tx.transmit(str2ab(bf_base64.base64Encode(encryptedPayload)));
   };
 
   return (
@@ -194,7 +195,7 @@ function App() {
               <Button
                 auto
                 color="primary"
-                disabled={transmitterBusy || receiver}
+                disabled={transmitterBusy || receiver}
                 onPress={() => {
                   transmitMessage(messageRef.current.value);
                 }}
@@ -250,7 +251,7 @@ function App() {
                 <Textarea
                   ref={messageLogRef}
                   minRows={7}
-                  maxRows={14}
+                  maxRows={20}
                   readOnly
                   css={{
                     width: "100%",
