@@ -2,20 +2,23 @@ import React, { useState } from "react";
 import {
   Container,
   Grid,
-  Text,
   Spacer,
   Textarea,
   Button,
-  Popover,
+  Input,
+  Collapse,
 } from "@nextui-org/react";
-import quiet, { ab2str, str2ab, mergeab } from "quietjs-bundle";
+import quiet, { ab2str, str2ab } from "quietjs-bundle";
+import TitleComponent from "./components/TitleComponent";
 
 function App() {
   const messageRef = React.useRef(null);
   const privateKeyRef = React.useRef(null);
-  const receivedMessagesRef = React.useRef(null);
+  const messageLogRef = React.useRef(null);
   const [transmitterBusy, setTransmitterBusy] = useState(false);
   const [receiver, setReceiver] = useState(null);
+  let lastReceivedTransmission = null;
+
   const toggleReceiver = () => {
     if (receiver) {
       receiver.destroy();
@@ -28,27 +31,66 @@ function App() {
     const rx = quiet.receiver({
       profile: "audible",
       onReceive: (payload) => {
+        const timeNow = new Date();
+        const timeSinceLastTransmission = lastReceivedTransmission
+          ? (timeNow - lastReceivedTransmission) / 1000
+          : -1;
+        lastReceivedTransmission = timeNow;
         const receivedMessage = ab2str(payload);
-        receivedMessagesRef.current.value += receivedMessage + "\n";
+        const newLine = timeSinceLastTransmission >= 1;
+        const printTime = newLine || timeSinceLastTransmission === -1;
+        if (printTime) {
+          messageRef.current.value = receivedMessage;
+        } else {
+          messageRef.current.value += receivedMessage;
+        }
+        messageLogRef.current.value +=
+          (newLine ? "\n" : "") +
+          (printTime
+            ? "--> [" +
+              timeNow.toLocaleDateString("et-EE", {
+                hour: "numeric",
+                minute: "numeric",
+                second: "numeric",
+              }) +
+              "]: "
+            : "") +
+          receivedMessage;
       },
       onReceiveFail: (noOfFailedFrames) => {
-        receivedMessagesRef.current.value +=
-          "Received frame checksum failed.\n";
+        const timeNow = new Date();
+        messageLogRef.current.value +=
+          "\n--> [" +
+          timeNow.toLocaleDateString("et-EE", {
+            hour: "numeric",
+            minute: "numeric",
+            second: "numeric",
+          }) +
+          "]: " +
+          "Received frame checksum failed.";
       },
     });
     setReceiver(rx);
   };
 
   const transmitMessage = (payload) => {
-    if (transmitterBusy || receiver) {
+    if (transmitterBusy || receiver || payload.length === 0) {
       return;
     }
     setTransmitterBusy(true);
     const tx = quiet.transmitter({
       profile: "audible",
       onFinish: () => {
-        console.log("Transmission end!");
-        setTransmitterBusy(false);
+        messageLogRef.current.value +=
+          "\n<-- [" +
+          new Date().toLocaleDateString("et-EE", {
+            hour: "numeric",
+            minute: "numeric",
+            second: "numeric",
+          }) +
+          "]: " +
+          payload;
+          setTransmitterBusy(false);
       },
     });
     tx.transmit(str2ab(payload));
@@ -57,163 +99,148 @@ function App() {
   return (
     <>
       <Container>
-        <Spacer y={2} />
-        <Text
-          h1
-          css={{
-            textGradient:
-              "45deg, rgba(146,34,195,1) 0%, rgba(162,38,35,1) 100%",
-            textAlign: "center",
-          }}
-        >
-          Tesseract
-          <Text
-            size={20}
-            as="span"
-            css={{
-              display: "block",
-            }}
-          >
-            Data over audio
-          </Text>
-        </Text>
-        <Spacer y={3} />
-        <Grid.Container gap={3}>
+        <Spacer y={1} />
+        <TitleComponent />
+        <Grid.Container gap={2}>
           <Grid
             xs={12}
+            lg={6}
             css={{
-              flexWrap: "wrap",
+              flexDirection: "column",
             }}
           >
-            <Textarea
-              label="Private passphrase"
-              helperText="Enter your private key for encryption"
-              ref={privateKeyRef}
-              clearable
-              rows={7}
-              css={{
-                width: "100%",
-              }}
-            />
-            <Button
-              auto
-              color="secondary"
-              onPress={() => (privateKeyRef.current.value = null)}
-              css={{
-                marginTop: "$10",
-                marginLeft: "auto",
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
               }}
             >
-              Clear
-            </Button>
+              <Input
+                label="Secret passphrase"
+                helperText="Enter your secret passphrase used for encryption"
+                ref={privateKeyRef}
+                clearable
+                rows={7}
+                css={{
+                  width: "100%",
+                }}
+              />
+              <Button
+                auto
+                color="secondary"
+                onPress={() => (privateKeyRef.current.value = null)}
+                css={{
+                  marginTop: "$10",
+                  marginLeft: "auto",
+                }}
+              >
+                Clear
+              </Button>
+            </div>
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+              }}
+            >
+              <Textarea
+                disabled={transmitterBusy}
+                label="Message transmission"
+                helperText="Enter or receive message"
+                ref={messageRef}
+                clearable
+                rows={7}
+                css={{
+                  width: "100%",
+                }}
+              />
+              <Button
+                auto
+                color="primary"
+                disabled={transmitterBusy}
+                onPress={() => {
+                  transmitMessage(messageRef.current.value);
+                }}
+                css={{
+                  marginTop: "$10",
+                  marginRight: "$8",
+                }}
+              >
+                {transmitterBusy ? "Sending..." : "Send"}
+              </Button>
+              <Button
+                auto
+                color={receiver ? "warning" : "success"}
+                onPress={() => {
+                  toggleReceiver();
+                }}
+                css={{
+                  marginTop: "$10",
+                  marginRight: "$8",
+                }}
+              >
+                {receiver ? "Stop listening" : "Listen"}
+              </Button>
+              <Button
+                auto
+                color="secondary"
+                onPress={() => (messageRef.current.value = null)}
+                css={{
+                  marginTop: "$10",
+                  marginLeft: "auto",
+                }}
+              >
+                Clear
+              </Button>
+            </div>
           </Grid>
           <Grid
             xs={12}
             lg={6}
             css={{
               flexWrap: "wrap",
+              alignContent: "start",
             }}
           >
-            <Textarea
-              readOnly
-              label="Received messages"
-              ref={receivedMessagesRef}
-              clearable
-              rows={7}
+            <Collapse
+              title="Message log"
+              divider={false}
               css={{
                 width: "100%",
               }}
-            />
-            <Button
-              color={receiver ? "warning" : "success"}
-              onPress={() => {
-                toggleReceiver();
-              }}
-              css={{
-                marginTop: "$10",
-                marginRight: "$10",
-              }}
             >
-              {receiver ? "Stop listening" : "Listen"}
-            </Button>
-            <Popover>
-              <Popover.Trigger>
-                <Button
-                  auto
+              <div>
+                <Textarea
+                  ref={messageLogRef}
+                  minRows={7}
+                  maxRows={20}
+                  readOnly
                   css={{
-                    marginTop: "$10",
-                    marginLeft: "auto",
-                    background: "$blue700",
+                    width: "100%",
                   }}
-                  onPress={() =>
-                    navigator.clipboard.writeText(
-                      receivedMessagesRef.current.value
-                    )
-                  }
+                />
+                <Spacer y={1} />
+                <div
+                  style={{
+                    display: "flex",
+                  }}
                 >
-                  Copy
-                </Button>
-              </Popover.Trigger>
-              <Popover.Content css={{ p: "$8" }}>
-                {"Messages copied to clipboard"}
-              </Popover.Content>
-            </Popover>
-            <Button
-              auto
-              color="secondary"
-              onPress={() => (receivedMessagesRef.current.value = null)}
-              css={{
-                marginTop: "$10",
-                marginLeft: "$10",
-              }}
-            >
-              Clear
-            </Button>
-          </Grid>
-          <Grid
-            xs={12}
-            lg={6}
-            css={{
-              flexWrap: "wrap",
-            }}
-          >
-            <Textarea
-              disabled={transmitterBusy}
-              label="Send message"
-              helperText="Enter your message to transmit"
-              ref={messageRef}
-              clearable
-              rows={7}
-              css={{
-                width: "100%",
-              }}
-            />
-            <Button
-              color="success"
-              disabled={transmitterBusy}
-              onPress={() => {
-                transmitMessage(messageRef.current.value);
-              }}
-              css={{
-                marginTop: "$10",
-                marginRight: "auto",
-              }}
-            >
-              {transmitterBusy ? "Sending..." : "Send"}
-            </Button>
-            <Button
-              auto
-              color="secondary"
-              onPress={() => (messageRef.current.value = null)}
-              css={{
-                marginTop: "$10",
-                marginLeft: "$10",
-              }}
-            >
-              Clear
-            </Button>
+                  <Button
+                    auto
+                    color="secondary"
+                    onPress={() => (messageLogRef.current.value = null)}
+                    css={{
+                      marginLeft: "auto",
+                    }}
+                  >
+                    Clear
+                  </Button>
+                </div>
+              </div>
+            </Collapse>
           </Grid>
         </Grid.Container>
+        <Spacer y={2} />
       </Container>
     </>
   );
