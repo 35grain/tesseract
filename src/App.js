@@ -208,6 +208,7 @@ function App() {
               </Button>
               <Button
                 auto
+                disabled={transmitterBusy}
                 color={receiver ? "warning" : "success"}
                 onPress={() => {
                   toggleReceiver();
