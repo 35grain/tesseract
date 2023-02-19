@@ -1,0 +1,57 @@
+diff --git a/node_modules/quietjs-bundle/_bundle.js b/node_modules/quietjs-bundle/_bundle.js
+index 9ff3fa1..48e64f8 100644
+--- a/node_modules/quietjs-bundle/_bundle.js
++++ b/node_modules/quietjs-bundle/_bundle.js
+@@ -1121,23 +1121,16 @@ var Quiet = (function() {
+         };
+     };
+ 
+-
+-    function createAudioInput() {
+-        audioInput = 0; // prevent others from trying to create
+-        window.setTimeout(function() {
+-            gUM.call(navigator, gUMConstraints(),
+-                function(e) {
+-                    audioInput = audioCtx.createMediaStreamSource(e);
+-
+-                    // stash a very permanent reference so this isn't collected
+-                    window.quiet_receiver_anti_gc = audioInput;
+-
+-                    audioInputReady();
+-                }, function(reason) {
+-                    audioInputFailed(reason.name);
+-                });
+-        }, 0);
+-    };
++    async function createAudioInput() {
++      try {
++          const stream = await navigator.mediaDevices.getUserMedia({audio: true});
++          audioInput = audioInput = audioCtx.createMediaStreamSource(stream);
++          window.quiet_receiver_anti_gc = audioInput;
++          audioInputReady();
++      } catch (err) {
++          audioInputFailed(err);
++      }
++  };
+ 
+     /**
+      * @typedef Receiver
+@@ -1231,18 +1224,6 @@ var Quiet = (function() {
+         resumeAudioContext();
+         // quiet does not create an audio input when it starts
+         // getting microphone access requires a permission dialog so only ask for it if we need it
+-        if (gUM === undefined) {
+-            gUM = (navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia);
+-        }
+-
+-        if (gUM === undefined) {
+-            // we couldn't find a suitable getUserMedia, so fail fast
+-            if (opts.onCreateFail !== undefined) {
+-                opts.onCreateFail("getUserMedia undefined (mic not supported by browser)");
+-            }
+-            return;
+-        }
+-
+         if (audioInput === undefined) {
+             createAudioInput()
+         }

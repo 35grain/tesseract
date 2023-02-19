@@ -89,6 +89,7 @@ function App() {
         payloadBuffer = mergeab(payloadBuffer, payload);
         timer.reset();
       },
+      onCreateFail: (reason) => console.log('Failed to start receiver: ' + reason),
       onReceiveFail: (noOfFailedFrames) => {
         const timeNow = new Date();
         messageLogRef.current.value +=
