@@ -11,7 +11,7 @@ import {
 import quiet, { ab2str, str2ab, mergeab } from "quietjs-bundle";
 import TitleComponent from "./components/TitleComponent";
 import Blowfish from "javascript-blowfish";
-import quietProfile from './quietProfile.json';
+import quietProfile from "./quietProfile.json";
 
 function App() {
   const messageRef = React.useRef(null);
@@ -60,14 +60,15 @@ function App() {
 
     messageRef.current.value = decryptedPayload;
     messageLogRef.current.value +=
-      "\n--> [" +
+      "--> [" +
       new Date().toLocaleDateString("et-EE", {
         hour: "numeric",
         minute: "numeric",
         second: "numeric",
       }) +
       "]: " +
-      decryptedPayload;
+      decryptedPayload +
+      "\n";
   };
   const timer = new Timer(decryptPayload, 1000);
   timer.stop();
@@ -91,14 +92,14 @@ function App() {
       onReceiveFail: (noOfFailedFrames) => {
         const timeNow = new Date();
         messageLogRef.current.value +=
-          "\n--> [" +
+          "--> [" +
           timeNow.toLocaleDateString("et-EE", {
             hour: "numeric",
             minute: "numeric",
             second: "numeric",
           }) +
           "]: " +
-          "Received frame checksum failed.";
+          "Received frame checksum failed.\n";
       },
     });
     setReceiver(rx);
@@ -120,14 +121,15 @@ function App() {
       profile: quietProfile,
       onFinish: () => {
         messageLogRef.current.value +=
-          "\n<-- [" +
+          "<-- [" +
           new Date().toLocaleDateString("et-EE", {
             hour: "numeric",
             minute: "numeric",
             second: "numeric",
           }) +
           "]: " +
-          payload;
+          payload +
+          "\n";
         setTransmitterBusy(false);
       },
     });
@@ -254,6 +256,7 @@ function App() {
                   minRows={7}
                   maxRows={20}
                   readOnly
+                  aria-label="Message log"
                   css={{
                     width: "100%",
                   }}
