@@ -1,11 +1,48 @@
 diff --git a/node_modules/quietjs-bundle/_bundle.js b/node_modules/quietjs-bundle/_bundle.js
-index 9ff3fa1..48e64f8 100644
+index 9ff3fa1..eeac202 100644
 --- a/node_modules/quietjs-bundle/_bundle.js
 +++ b/node_modules/quietjs-bundle/_bundle.js
-@@ -1121,23 +1121,16 @@ var Quiet = (function() {
-         };
-     };
+@@ -1084,60 +1084,28 @@ var Quiet = (function() {
+         audioInputReadyCallbacks.push(c);
+     }
  
+-    function gUMConstraints() {
+-        if (navigator.webkitGetUserMedia !== undefined) {
+-            return {
+-                audio: {
+-                    optional: [
+-                      {googAutoGainControl: false},
+-                      {googAutoGainControl2: false},
+-                      {echoCancellation: false},
+-                      {googEchoCancellation: false},
+-                      {googEchoCancellation2: false},
+-                      {googDAEchoCancellation: false},
+-                      {googNoiseSuppression: false},
+-                      {googNoiseSuppression2: false},
+-                      {googHighpassFilter: false},
+-                      {googTypingNoiseDetection: false},
+-                      {googAudioMirroring: false}
+-                    ]
+-                }
+-            };
+-        }
+-        if (navigator.mozGetUserMedia !== undefined) {
+-            return {
+-                audio: {
+-                    echoCancellation: false,
+-                    mozAutoGainControl: false,
+-                    mozNoiseSuppression: false
+-                }
+-            };
+-
+-        }
+-        return {
+-            audio: {
+-                echoCancellation: false
+-            }
+-        };
+-    };
+-
 -
 -    function createAudioInput() {
 -        audioInput = 0; // prevent others from trying to create
@@ -25,7 +62,19 @@ index 9ff3fa1..48e64f8 100644
 -    };
 +    async function createAudioInput() {
 +      try {
-+          const stream = await navigator.mediaDevices.getUserMedia({audio: true});
++          const stream = await navigator.mediaDevices.getUserMedia(
++            {
++              audio: {
++                autoGainControl: false,
++                channelCount: 2,
++                echoCancellation: false,
++                latency: 0,
++                noiseSuppression: false,
++                sampleRate: 48000,
++                sampleSize: 16,
++                volume: 1.0
++              }
++            });
 +          audioInput = audioInput = audioCtx.createMediaStreamSource(stream);
 +          window.quiet_receiver_anti_gc = audioInput;
 +          audioInputReady();
@@ -36,7 +85,7 @@ index 9ff3fa1..48e64f8 100644
  
      /**
       * @typedef Receiver
-@@ -1231,18 +1224,6 @@ var Quiet = (function() {
+@@ -1231,18 +1199,6 @@ var Quiet = (function() {
          resumeAudioContext();
          // quiet does not create an audio input when it starts
          // getting microphone access requires a permission dialog so only ask for it if we need it
