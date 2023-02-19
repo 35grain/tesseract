@@ -17,7 +17,7 @@ function App() {
   const messageRef = React.useRef(null);
   const privateKeyRef = React.useRef(null);
   const messageLogRef = React.useRef(null);
-  const [transmitterBusy, setTransmitterBusy] = useState(false);
+  const [transmitter, setTransmitter] = useState(null);
   const [receiver, setReceiver] = useState(null);
   const bf_base64 = new Blowfish("");
   let payloadBuffer = new ArrayBuffer(0);
@@ -79,7 +79,7 @@ function App() {
       setReceiver(null);
       return;
     }
-    if (transmitterBusy) {
+    if (transmitter) {
       return;
     }
     const rx = quiet.receiver({
@@ -107,7 +107,12 @@ function App() {
   };
 
   const transmitMessage = (payload) => {
-    if (transmitterBusy || receiver || payload.length === 0) {
+    if (transmitter) {
+      transmitter.destroy();
+      setTransmitter(null);
+      return;
+    }
+    if (receiver || payload.length === 0) {
       return;
     }
     let encryptedPayload = payload;
@@ -116,7 +121,6 @@ function App() {
       encryptedPayload = bf.encrypt(payload);
     }
 
-    setTransmitterBusy(true);
     const tx = quiet.transmitter({
       clampFrame: false,
       profile: quietProfile,
@@ -131,9 +135,10 @@ function App() {
           "]: " +
           payload +
           "\n";
-        setTransmitterBusy(false);
+        setTransmitter(null);
       },
     });
+    setTransmitter(tx);
     tx.transmit(str2ab(bf_base64.base64Encode(encryptedPayload)));
   };
 
@@ -185,7 +190,7 @@ function App() {
               }}
             >
               <Textarea
-                disabled={transmitterBusy}
+                disabled={transmitter}
                 label="Message transmission"
                 helperText="Enter or receive message"
                 ref={messageRef}
@@ -197,28 +202,28 @@ function App() {
               />
               <Button
                 auto
-                color="primary"
-                disabled={transmitterBusy || receiver}
+                color={transmitter ? "warning" : "primary"}
+                disabled={receiver}
                 onPress={() => {
                   transmitMessage(messageRef.current.value);
                 }}
                 css={{
                   marginTop: "$10",
-                  marginRight: "$8",
+                  marginRight: "$6",
                 }}
               >
-                {transmitterBusy ? "Sending..." : "Send"}
+                {transmitter ? "Stop sending" : "Send"}
               </Button>
               <Button
                 auto
-                disabled={transmitterBusy}
+                disabled={transmitter}
                 color={receiver ? "warning" : "success"}
                 onPress={() => {
                   toggleReceiver();
                 }}
                 css={{
                   marginTop: "$10",
-                  marginRight: "$8",
+                  marginRight: "$6",
                 }}
               >
                 {receiver ? "Stop listening" : "Listen"}
