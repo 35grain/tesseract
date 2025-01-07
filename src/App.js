@@ -22,31 +22,33 @@ function App() {
   const bf_base64 = new Blowfish("");
   let payloadBuffer = new ArrayBuffer(0);
 
-  function Timer(fn, t) {
-    var timerObj = setTimeout(fn, t);
+  class Timer {
+    constructor(fn, t) {
+      var timerObj = setTimeout(fn, t);
 
-    this.stop = function () {
-      if (timerObj) {
-        clearTimeout(timerObj);
-        timerObj = null;
-      }
-      return this;
-    };
+      this.stop = function () {
+        if (timerObj) {
+          clearTimeout(timerObj);
+          timerObj = null;
+        }
+        return this;
+      };
 
-    // start timer using current settings (if it's not already running)
-    this.start = function () {
-      if (!timerObj) {
-        this.stop();
-        timerObj = setTimeout(fn, t);
-      }
-      return this;
-    };
+      // start timer using current settings (if it's not already running)
+      this.start = function () {
+        if (!timerObj) {
+          this.stop();
+          timerObj = setTimeout(fn, t);
+        }
+        return this;
+      };
 
-    // start with new or original interval, stop current interval
-    this.reset = function (newT = t) {
-      t = newT;
-      return this.stop().start();
-    };
+      // start with new or original interval, stop current interval
+      this.reset = function (newT = t) {
+        t = newT;
+        return this.stop().start();
+      };
+    }
   }
 
   const decryptPayload = () => {
@@ -90,7 +92,7 @@ function App() {
         timer.reset();
       },
       onCreateFail: (reason) => console.log('Failed to start receiver: ' + reason),
-      onReceiveFail: (noOfFailedFrames) => {
+      onReceiveFail: (_) => {
         const timeNow = new Date();
         messageLogRef.current.value +=
           "--> [" +
