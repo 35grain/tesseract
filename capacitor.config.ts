@@ -4,7 +4,6 @@ const config: CapacitorConfig = {
   appId: 'com.tesseract.app',
   appName: 'tesseract',
   webDir: 'build',
-  bundledWebRuntime: false,
   server: {
     hostname: 'localhost',
     iosScheme: 'https',
